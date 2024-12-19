@@ -1,0 +1,13 @@
+{
+    "http://ariadne.id/version": 0,
+    "http://ariadne.id/type": "profile",
+    "http://ariadne.id/name": "<profile name>",
+    "http://ariadne.id/email": "<optional e-mail address>",
+    "http://ariadne.id/description": "<optional description>",
+    "http://ariadne.id/avatar_url": "<optional avatar URL>",
+    "http://ariadne.id/claims": [
+        "<list of claims>"
+    ],
+    "http://ariadne.id/color": "<optional hex color>",
+    "exp": "<optional expiry time as unix epoch>"
+}
