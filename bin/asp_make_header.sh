@@ -2,9 +2,17 @@
 
 # MIT License
 # 
-# Copyright (c) 2024 Tim Kaune
+# Copyright (c) 2025 Tim Kaune
 
 # $1 argument: File path to private key in PEM format
+
+err_echo() {
+    1>&2 echo -e "$@";
+}
+
+check_command() {
+    command -v "$@" >/dev/null 2>&1
+}
 
 strip_padding() {
     tr -d '='
@@ -53,7 +61,7 @@ extract_es256_x_parameter() {
 
 extract_es256_y_parameter() {
     openssl pkey -pubin -pubout -outform DER | \
-    # extract fwk.x
+    # extract fwk.y
     tail -c 32 | \
     basenc -w 0 --base64url | \
     strip_padding
@@ -74,11 +82,22 @@ calculate_es256_thumbprint() {
     strip_padding
 }
 
+if ! check_command 'openssl'; then
+    err_echo "Cannot find 'openssl'. Please install openssl client package."
+    exit 1
+elif ! check_command 'xxd'; then
+    err_echo "Cannot find 'xxd'. Please install it."
+    exit 1
+elif ! check_command 'basenc'; then
+    err_echo "Cannot find GNU Core Utils. Please install them."
+    exit 1
+fi
+
 if [[ -z "$1" ]]; then
-    echo "Usage: make_asp_header.sh <path to private key>"
+    err_echo "Usage: asp_make_header.sh <path to private key>"
     exit 1
 elif ! [[ -f "$1" ]]; then
-    echo "Key file '$1' does not exist."
+    err_echo "Key file '$1' does not exist."
     exit 1
 fi
 
@@ -124,6 +143,6 @@ elif [[ "${PUBLIC_KEY_INFO}" =~ P-256 ]]; then
 }
 EOF
 else
-    echo "Unsupported key type! ASPs only support EdDSA/Ed25519 and ES256/P-256 keys."
+    err_echo "Unsupported key type! ASPs only support EdDSA/Ed25519 and ES256/P-256 keys."
     exit 1
 fi

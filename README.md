@@ -4,16 +4,24 @@ This project contains a few shell scripts to manually craft ASPs.
 
 ## Prerequesites ##
 
-These shell scripts use the `openssl` program as well as some of the GNU core
-utilities. Please make sure you install the relevant packages using your
-distribution's package manager.
+These bash scripts use the following programs:
+
+- `bash` (obviously)
+- `openssl`
+- `xxd`
+- `sed`
+- `grep`
+- GNU core utilities
+
+Please make sure you install the relevant packages using your distribution's
+package manager.
 
 ## ASP Structure ##
 
 Your ASP is basically a special JSON Web Token (JWT). It's a long, random
 looking string which consists of three parts. Each part is a base64 encoded
 string and they are concatenated with single dots (`.`). The first part is the
-ASP header, the second part is called ASP payload, and the third part cointains
+ASP header, the second part is called ASP payload, and the third part contains
 the digital signature over the first two parts using a cryptographic key.
 
 ## Key Creation ##
@@ -29,13 +37,13 @@ To use either signature type, you need a key with the corresponding algorithm
 and curve. Create the key for the EdDSA signature type like this:
 
 ```shell
-$ openssl genpkey -algorithm ED25519 -aes-256-cbc -out ./key/asp.key.pem
+$ openssl genpkey -algorithm ED25519 -aes-256-cbc -out "./key/asp.key.pem"
 ```
 
 Create the key for the ES256 signature type like this:
 
 ```shell
-$ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -aes-256-cbc -out ./key/asp.key.pem
+$ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -aes-256-cbc -out "./key/asp.key.pem"
 ```
 
 Both commands use AES256 symmetric encryption for the private key. You will be
@@ -51,27 +59,36 @@ access to this key file could maliciously manipulate your ASP.
 Create the ASP header cleartext JSON file with:
 
 ```shell
-$ ./bin/make_asp_header.sh ./key/asp.key.pem > ./dist/asp_header.json
+$ ./bin/asp_make_header.sh "./key/asp.key.pem" > "./dist/asp_header.json"
 ```
 
-If the private key is password protected (as it should be), `openssl` will ask
-for your password to extract the public part of the key.
+This is a one-time operation. A cryptographic key will always produce the exact
+same header JSON file. If the private key is password protected (as it should
+be), `openssl` will ask for your password to extract the public part of the key.
 
 You can inspect your `asp_header.json` in any text editor. It contains your
 ASP's fingerprint (`kid`) as well as the public part of your key in JSON Web Key
-(JWK) format. This is intended to and safe to publish!
+(JWK) format. This is intended to and safe to publish! Don't modify the file
+manually. If you do accidentally, recreate it with the above command.
 
 ## Create/Edit ASP Payload ##
 
-Copy the ASP payload template file to the `dist` folder:
+1. If you don't already have an ASP payload JSON file, copy the ASP payload
+   template file to the `dist` folder:
 
-```shell
-$ cp ./src/asp_payload.template.json ./dist/asp_payload.json
-```
+   ```shell
+   $ cp ./src/asp_payload.template.json ./dist/asp_payload.json
+   ```
 
-Open `./dist/asp_payload.json` in your favorite editor. Enter your information
-in the respective fields. Delete the optional fields you don't need. Refer to
-the [Keyoxide Docs][service-providers] for claim formatting.
+2. Open `./dist/asp_payload.json` in your favorite editor. Enter or update your
+   information in the respective fields. Delete the optional fields you don't
+   need. Refer to the [Keyoxide Docs][service-providers] for claim formatting.
+
+3. Add or update the expiration date of your ASP with
+
+   ```shell
+   $ ./bin/asp_expire.sh "./dist/asp_payload.json" "2025-01-01 00:00:00+00:00"
+   ```
 
 [service-providers]: <https://docs.keyoxide.org/service-providers/>
 
@@ -80,8 +97,8 @@ the [Keyoxide Docs][service-providers] for claim formatting.
 When you're finished editing your ASP payload JSON, create your latest ASP with
 
 ```shell
-$ mkdir -p ./dist/.well-known/aspe/id
-$ ./bin/make_asp.sh ./key/asp.key.pem ./dist/asp_header.json ./dist/asp_payload.json > "./dist$(./bin/asp_get_endpoint.sh ./dist/asp_header.json)"
+$ mkdir -p "./dist/.well-known/aspe/id"
+$ ./bin/asp_make.sh "./key/asp.key.pem" "./dist/asp_header.json" "./dist/asp_payload.json" > "./dist$(./bin/asp_get_endpoint.sh "./dist/asp_header.json")"
 ```
 
 If the private key is password protected (as it should be), `openssl` will ask

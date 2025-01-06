@@ -8,6 +8,5 @@
     "http://ariadne.id/claims": [
         "<list of claims>"
     ],
-    "http://ariadne.id/color": "<optional hex color>",
-    "exp": "<optional expiry time as unix epoch>"
+    "http://ariadne.id/color": "<optional hex color>"
 }

@@ -2,11 +2,19 @@
 
 # MIT License
 # 
-# Copyright (c) 2024 Tim Kaune
+# Copyright (c) 2025 Tim Kaune
 
 # $1 argument: File path to private key in PEM format
 # $2 argument: File path to ASP header JSON file
 # $3 argument: File path to ASP payload JSON file
+
+err_echo() {
+    1>&2 echo -e "$@";
+}
+
+check_command() {
+    command -v "$@" >/dev/null 2>&1
+}
 
 strip_padding() {
     tr -d '='
@@ -21,37 +29,55 @@ minify_json() {
     sed -r -e 's/(\[|\{|,)[ \t]+"/\1"/g' -e 's/":[ \t]/":/g' -e 's/[ \t]+(\]|\})/\1/g'
 }
 
-if [[ -z "$3" ]] || [[ -z "$2" ]] || [[ -z "$1" ]]; then
-    echo "Usage: make_asp.sh <path to private key> <path to header JSON> <path to payload JSON>"
+if ! check_command 'openssl'; then
+    err_echo "Cannot find 'openssl'. Please install openssl client package."
     exit 1
-elif ! [[ -f "$1" ]]; then
-    echo "Key file '$1' does not exist."
+elif ! check_command 'xxd'; then
+    err_echo "Cannot find 'xxd'. Please install it."
     exit 1
-elif ! [[ -f "$2" ]]; then
-    echo "ASP header file '$2' does not exist."
+elif ! check_command 'grep'; then
+    err_echo "Cannot find 'grep'. Please install it."
     exit 1
-elif ! [[ -f "$3" ]]; then
-    echo "ASP payload file '$3' does not exist."
+elif ! check_command 'sed'; then
+    err_echo "Cannot find 'sed'. Please install it."
+    exit 1
+elif ! check_command 'basenc'; then
+    err_echo "Cannot find GNU Core Utils. Please install them."
     exit 1
 fi
 
-ASP_HEADER="$(cat <"$2")"
-ASP_HEADER_ENC="$(minify_json <<<"${ASP_HEADER}" | base64url_encode | strip_padding)"
+if [[ -z "$3" ]] || [[ -z "$2" ]] || [[ -z "$1" ]]; then
+    err_echo "Usage: asp_make.sh <path to private key> <path to header JSON> <path to payload JSON>"
+    exit 1
+elif ! [[ -f "$1" ]]; then
+    err_echo "Key file '$1' does not exist."
+    exit 1
+elif ! [[ -f "$2" ]]; then
+    err_echo "ASP header file '$2' does not exist."
+    exit 1
+elif ! [[ -f "$3" ]]; then
+    err_echo "ASP payload file '$3' does not exist."
+    exit 1
+fi
+
+ASP_HEADER_ENC="$(minify_json <"$2" | base64url_encode | strip_padding)"
 ASP_PAYLOAD_ENC="$(minify_json <"$3" | base64url_encode | strip_padding)"
 
-ASP_ALG="$(cat <<<"${ASP_HEADER}" | grep -o -e '"alg": ".*"')"
-ASP_ALG="${ASP_ALG:8: -1}"
+ASP_ALG="$(grep -o -e '"alg": ".*"' "$2")"
+ASP_ALG="${ASP_ALG:8:$((${#ASP_ALG} - 8 - 1))}"
 
 if [[ "${ASP_ALG}" = "EdDSA" ]]; then
-    printf %s "${ASP_HEADER_ENC}.${ASP_PAYLOAD_ENC}" >"./temp.signature.txt"
+    SIGNATURE_CONTENT_TEMP_FILE="$(mktemp)"
+    printf %s "${ASP_HEADER_ENC}.${ASP_PAYLOAD_ENC}" >"${SIGNATURE_CONTENT_TEMP_FILE}"
 
+    # EdDSA signatures only work with an input file in openssl
     ASP_SIGNATURE_ENC="$( \
-        openssl pkeyutl -rawin -in "./temp.signature.txt" -sign -inkey "$1" | \
+        openssl pkeyutl -rawin -in "${SIGNATURE_CONTENT_TEMP_FILE}" -sign -inkey "$1" | \
         base64url_encode | \
         strip_padding \
     )"
 
-    rm "./temp.signature.txt"
+    rm "${SIGNATURE_CONTENT_TEMP_FILE}"
 elif [[ "${ASP_ALG}" = "ES256" ]]; then
     PARSED_ASN1DER_SIGNATURE="$( \
         printf %s "${ASP_HEADER_ENC}.${ASP_PAYLOAD_ENC}" | \
@@ -94,7 +120,7 @@ elif [[ "${ASP_ALG}" = "ES256" ]]; then
         strip_padding \
     )"
 else
-    echo "Unsupported sign algorithm! ASPs only support EdDSA and ES256."
+    err_echo "Unsupported sign algorithm! ASPs only support EdDSA and ES256."
     exit 1
 fi
 
