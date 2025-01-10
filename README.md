@@ -54,6 +54,23 @@ access to this key file could maliciously manipulate your ASP.
 
 [ariadne-signature-profile-0]: <https://ariadne.id/related/ariadne-signature-profile-0/>
 
+## Test/Change Key Passphrase ##
+
+You can test the current password with
+
+```shell
+$ openssl pkey -in ./key/asp.key.pem -pubout -text
+```
+
+You can change your private key's password later like this:
+
+```shell
+$ openssl pkey -in ./key/asp.key.pem -out ./key/asp.key.pem.new -aes-256-cbc
+```
+
+If the private key is password protected (as it should be), `openssl` will ask
+for your password. Then you'll be prompted for the new password.
+
 ## Create ASP Header ##
 
 Create the ASP header cleartext JSON file with:
